@@ -7,9 +7,9 @@ import random
 VERTICAL = 1
 HORIZONTAL = -1
 anchor_thresh = 8
-scan_interval = 4
+scan_interval = 3
 ksize_gaussian = 5
-sigma_gaussian = 3
+sigma_gaussian = 1
 ksize_sobel = 3
 gradient_thresh = 36
 
@@ -94,7 +94,6 @@ class EdgeDrawing:
     while True:
       if not self.visited[row][col]:
         current_segment.append([row, col])
-      print(row, col)
       self.visited[row][col] = True
       next_row = row_fn(row, col)
       next_col = col_fn(col)
@@ -114,7 +113,6 @@ class EdgeDrawing:
     while True:
       if not self.visited[row][col]:
         current_segment.append([row, col])
-      print(row, col)
       self.visited[row][col] = True
       next_col = col_fn(row, col)
       next_row = row_fn(row)
@@ -136,15 +134,9 @@ class EdgeDrawing:
     dec = lambda a: a - 1
     self.visited[row][col] = True
     if self.ED[row][col] == HORIZONTAL:
-      print("left")
       left_segment = self.__proceedLR(row, col, self.__getL, dec)
-      print("right")
       right_segment = self.__proceedLR(row, col, self.__getR, inc)
       if len(left_segment) == 0 or len(right_segment) == 0:
-        if len(left_segment) == 0:
-          print("No left")
-        if len(right_segment) == 0:
-          print("No right")
         current_segment.extend(left_segment)
         current_segment.append([row, col])
         current_segment.extend(right_segment)
@@ -153,19 +145,12 @@ class EdgeDrawing:
         combined.extend(left_segment[::-1])
         combined.append([row, col])
         combined.extend(right_segment)
-        print("ADDING LR", len(left_segment), len(right_segment), row, col)
         self.edge_segments.append(combined)
 
     if self.ED[row][col] == VERTICAL:
-      print("down")
       down_segment = self.__proceedUD(row, col, dec, self.__getD)
-      print("up")
       up_segment = self.__proceedUD(row, col, inc, self.__getU)
       if len(down_segment) == 0 or len(up_segment) == 0:
-        if len(down_segment) == 0:
-          print("No down")
-        if len(up_segment) == 0:
-          print("No up")
         current_segment.extend(down_segment)
         current_segment.append([row, col])
         current_segment.extend(up_segment)
@@ -174,7 +159,6 @@ class EdgeDrawing:
         combined.extend(down_segment[::-1])
         combined.append([row, col])
         combined.extend(up_segment)
-        print("ADDING UD", len(up_segment), len(down_segment), row, col)
         self.edge_segments.append(combined)
 
   def ConnectAnchors(self):
@@ -183,7 +167,6 @@ class EdgeDrawing:
       if not self.visited[row][col]:
         parent_segment = []
         self.__proceed(row, col, parent_segment)
-        print("ADDING - Anch", len(parent_segment))
         self.edge_segments.append(parent_segment)
 
     for row in range(self.ROWS):
@@ -194,30 +177,17 @@ class EdgeDrawing:
 if __name__=="__main__":
   e = EdgeDrawing()
   print("applying gaussian filter")
-  img = e.GaussianFilter("yoni.tif")
+  img = e.GaussianFilter("lenna.png")
   print("applying sobel operator")
   e.SobelOperator(img) 
   print("finding anchors")
   e.FindAnchors()
   print("connecting anchors")
   e.ConnectAnchors()
-  print(len(e.edge_segments))
-#  
-#  print(np.shape(img,))
   imgData = np.zeros((np.shape(img) + (3,)), dtype=np.uint8)
-#  imgData2 = np.zeros((np.shape(img) + (3,)), dtype=np.uint8)
-#  x, y = [], []
   for a in e.edge_segments:
-    color = [random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)]
+    color = [random.randint(0, 128), random.randint(0, 128), random.randint(0, 128)]
     for [x_, y_] in a:
       imgData[x_, y_] = color
-      
-  
-
-#  for [x_, y_] in e.anchors:
-#    imgData2[x_, y_] = [255, 0, 0]
-#  
   img = Image.fromarray(imgData, 'RGB')
   img.save('res.png')
-#  img = Image.fromarray(imgData2, 'RGB')
-#  img.save('anchs.png')
