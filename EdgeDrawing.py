@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
+from PIL import Image
 
 VERTICAL = 1
 HORIZONTAL = -1
@@ -150,4 +151,4 @@ if __name__=="__main__":
 
   plt.scatter(x, y, marker=',', color='r')
   plt.imshow(e.G, cmap='gray')
-  plt.show()
+  #plt.show()
