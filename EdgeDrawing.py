@@ -7,9 +7,9 @@ import random
 VERTICAL = 1
 HORIZONTAL = -1
 anchor_thresh = 8
-scan_interval = 2
+scan_interval = 4
 ksize_gaussian = 5
-sigma_gaussian = 1
+sigma_gaussian = 3
 ksize_sobel = 3
 gradient_thresh = 36
 
@@ -43,7 +43,7 @@ class EdgeDrawing:
     G_r = cv2.Sobel(image, cv2.CV_64F, 1, 0, ksize=ksize_sobel) # going along the row - vert
     G_c = cv2.Sobel(image, cv2.CV_64F, 0, 1, ksize=ksize_sobel) # going along the col - horiz
     self.__GradientAndEdgeDirectionMap(G_r, G_c)
-    #cv2.imwrite('Gradient.bmp', 255*(self.G>0).astype(int))
+    cv2.imwrite('Gradient.bmp', 255*(self.G>0).astype(int))
   
   def __isAnchor(self, row, col):
     current = self.G[row][col]
@@ -94,6 +94,7 @@ class EdgeDrawing:
     while True:
       if not self.visited[row][col]:
         current_segment.append([row, col])
+      print(row, col)
       self.visited[row][col] = True
       next_row = row_fn(row, col)
       next_col = col_fn(col)
@@ -105,7 +106,7 @@ class EdgeDrawing:
         return current_segment
       if self.ED[row][col] == VERTICAL:
         break
-    self.__proceed(row, col)
+    self.__proceed(row, col, current_segment)
     return current_segment
 
   def __proceedUD(self, row, col, row_fn, col_fn):
@@ -113,6 +114,7 @@ class EdgeDrawing:
     while True:
       if not self.visited[row][col]:
         current_segment.append([row, col])
+      print(row, col)
       self.visited[row][col] = True
       next_col = col_fn(row, col)
       next_row = row_fn(row)
@@ -124,42 +126,65 @@ class EdgeDrawing:
         return current_segment
       if self.ED[row][col] == HORIZONTAL:
         break
-    self.__proceed(row, col)
+    self.__proceed(row, col, current_segment)
     return current_segment
 
-  def __proceed(self, row, col):
+  def __proceed(self, row, col, current_segment):
     if self.visited[row][col]:
       return 
     inc = lambda a: a + 1
     dec = lambda a: a - 1
-    current_segment = []
+    self.visited[row][col] = True
     if self.ED[row][col] == HORIZONTAL:
+      print("left")
       left_segment = self.__proceedLR(row, col, self.__getL, dec)
+      print("right")
       right_segment = self.__proceedLR(row, col, self.__getR, inc)
       if len(left_segment) == 0 or len(right_segment) == 0:
+        if len(left_segment) == 0:
+          print("No left")
+        if len(right_segment) == 0:
+          print("No right")
         current_segment.extend(left_segment)
+        current_segment.append([row, col])
         current_segment.extend(right_segment)
       else:
-        current_segment.extend(left_segment[::-1])
-        current_segment.extend(right_segment)
-      self.edge_segments.append(current_segment)
+        combined = []
+        combined.extend(left_segment[::-1])
+        combined.append([row, col])
+        combined.extend(right_segment)
+        print("ADDING LR", len(left_segment), len(right_segment), row, col)
+        self.edge_segments.append(combined)
 
     if self.ED[row][col] == VERTICAL:
+      print("down")
       down_segment = self.__proceedUD(row, col, dec, self.__getD)
+      print("up")
       up_segment = self.__proceedUD(row, col, inc, self.__getU)
       if len(down_segment) == 0 or len(up_segment) == 0:
+        if len(down_segment) == 0:
+          print("No down")
+        if len(up_segment) == 0:
+          print("No up")
         current_segment.extend(down_segment)
+        current_segment.append([row, col])
         current_segment.extend(up_segment)
       else:
-        current_segment.extend(down_segment[::-1])
-        current_segment.extend(up_segment)
-      self.edge_segments.append(current_segment)
+        combined = []
+        combined.extend(down_segment[::-1])
+        combined.append([row, col])
+        combined.extend(up_segment)
+        print("ADDING UD", len(up_segment), len(down_segment), row, col)
+        self.edge_segments.append(combined)
 
   def ConnectAnchors(self):
     self.visited = np.zeros(np.shape(self.G), dtype = bool)
     for [row, col] in self.anchors:
       if not self.visited[row][col]:
-        self.__proceed(row, col)
+        parent_segment = []
+        self.__proceed(row, col, parent_segment)
+        print("ADDING - Anch", len(parent_segment))
+        self.edge_segments.append(parent_segment)
 
     for row in range(self.ROWS):
       for col in range(self.COLS):
@@ -169,7 +194,7 @@ class EdgeDrawing:
 if __name__=="__main__":
   e = EdgeDrawing()
   print("applying gaussian filter")
-  img = e.GaussianFilter("lenna.png")
+  img = e.GaussianFilter("yoni.tif")
   print("applying sobel operator")
   e.SobelOperator(img) 
   print("finding anchors")
@@ -182,16 +207,12 @@ if __name__=="__main__":
   imgData = np.zeros((np.shape(img) + (3,)), dtype=np.uint8)
 #  imgData2 = np.zeros((np.shape(img) + (3,)), dtype=np.uint8)
 #  x, y = [], []
-#  for [x_, y_] in e.edgels:
-#    imgData[x_, y_] = [255, 0, 0]
-#    x.append(y_)
-#    y.append(x_)
-#  
   for a in e.edge_segments:
     color = [random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)]
     for [x_, y_] in a:
       imgData[x_, y_] = color
       
+  
 
 #  for [x_, y_] in e.anchors:
 #    imgData2[x_, y_] = [255, 0, 0]
