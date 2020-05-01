@@ -6,8 +6,8 @@ import random
 
 VERTICAL = 1
 HORIZONTAL = -1
-anchor_thresh = 8
-scan_interval = 3
+anchor_thresh = 60
+scan_interval = 1
 ksize_gaussian = 5
 sigma_gaussian = 1
 ksize_sobel = 3
@@ -15,21 +15,24 @@ gradient_thresh = 36
 
 class EdgeDrawing:
   def __init__(self):
+    self.img = []
     self.anchors = []
     self.G = []
     self.ED = []
     self.visited = []
     self.edgels = []
     self.edge_segments = []
+    self.uni_segs = []
     self.ROWS = -1
     self.COLS = -1
-
+    
   def GaussianFilter(self, filename: str): 
     img = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
     dst = cv2.GaussianBlur(img, (ksize_gaussian, ksize_gaussian), sigma_gaussian)
+    self.img = dst
     [self.ROWS, self.COLS] = np.shape(dst)
-    wew = Image.fromarray(dst)
-    wew.save("blurred.png")
+    blurred = Image.fromarray(dst)
+    blurred.save("blurred.png")
     return dst
 
   def __GradientAndEdgeDirectionMap(self, G_r, G_c):
@@ -104,8 +107,9 @@ class EdgeDrawing:
       if self.G[row][col] <= 0 or self.visited[row][col]:
         return current_segment
       if self.ED[row][col] == VERTICAL:
+        rest = self.__proceed(row, col)
+        current_segment.extend(rest)
         break
-    self.__proceed(row, col, current_segment)
     return current_segment
 
   def __proceedUD(self, row, col, row_fn, col_fn):
@@ -123,71 +127,72 @@ class EdgeDrawing:
       if self.G[row][col] <= 0 or self.visited[row][col]:
         return current_segment
       if self.ED[row][col] == HORIZONTAL:
+        rest = self.__proceed(row, col)
+        current_segment.extend(rest)
         break
-    self.__proceed(row, col, current_segment)
+
     return current_segment
 
-  def __proceed(self, row, col, current_segment):
+  def __proceed(self, row, col):
     if self.visited[row][col]:
       return 
     inc = lambda a: a + 1
     dec = lambda a: a - 1
+    current_segment = []
     self.visited[row][col] = True
     if self.ED[row][col] == HORIZONTAL:
       left_segment = self.__proceedLR(row, col, self.__getL, dec)
       right_segment = self.__proceedLR(row, col, self.__getR, inc)
+
       if len(left_segment) == 0 or len(right_segment) == 0:
         current_segment.extend(left_segment)
         current_segment.append([row, col])
         current_segment.extend(right_segment)
-      else:
-        combined = []
-        combined.extend(left_segment[::-1])
-        combined.append([row, col])
-        combined.extend(right_segment)
-        self.edge_segments.append(combined)
+        return  current_segment
+      current_segment.extend(left_segment[::-1])
+      current_segment.append([row, col])
+      current_segment.extend(right_segment)
+      self.edge_segments.append(current_segment)
 
     if self.ED[row][col] == VERTICAL:
       down_segment = self.__proceedUD(row, col, dec, self.__getD)
       up_segment = self.__proceedUD(row, col, inc, self.__getU)
+
       if len(down_segment) == 0 or len(up_segment) == 0:
         current_segment.extend(down_segment)
         current_segment.append([row, col])
         current_segment.extend(up_segment)
-      else:
-        combined = []
-        combined.extend(down_segment[::-1])
-        combined.append([row, col])
-        combined.extend(up_segment)
-        self.edge_segments.append(combined)
+        return current_segment
+      current_segment.extend(down_segment[::-1])
+      current_segment.append([row, col])
+      current_segment.extend(up_segment)
+      self.edge_segments.append(current_segment)
+    return []
 
   def ConnectAnchors(self):
     self.visited = np.zeros(np.shape(self.G), dtype = bool)
     for [row, col] in self.anchors:
       if not self.visited[row][col]:
-        parent_segment = []
-        self.__proceed(row, col, parent_segment)
-        self.edge_segments.append(parent_segment)
+        segment = self.__proceed(row, col)
+        if len(segment) > 0:
+          self.edge_segments.append(segment)
 
     for row in range(self.ROWS):
       for col in range(self.COLS):
         if self.visited[row][col]:
           e.edgels.append([row, col])
-    
+
 if __name__=="__main__":
   e = EdgeDrawing()
-  print("applying gaussian filter")
-  img = e.GaussianFilter("lenna.png")
-  print("applying sobel operator")
+  img = e.GaussianFilter("peppers.png")
   e.SobelOperator(img) 
-  print("finding anchors")
   e.FindAnchors()
-  print("connecting anchors")
   e.ConnectAnchors()
+
   imgData = np.zeros((np.shape(img) + (3,)), dtype=np.uint8)
   for a in e.edge_segments:
     color = [random.randint(0, 128), random.randint(0, 128), random.randint(0, 128)]
     for [x_, y_] in a:
       imgData[x_, y_] = color
-  img = Image.fromarray(imgData, 'RGB')
-  img.save('res.png')
+  result= Image.fromarray(imgData, 'RGB')
+  result.save('result.png')
