@@ -6,8 +6,8 @@ import random
 
 VERTICAL = 1
 HORIZONTAL = -1
-anchor_thresh = 8
-scan_interval = 3
+anchor_thresh = 60
+scan_interval = 1
 ksize_gaussian = 5
 sigma_gaussian = 1
 ksize_sobel = 3
@@ -25,43 +25,6 @@ class EdgeDrawing:
     self.uni_segs = []
     self.ROWS = -1
     self.COLS = -1
-
-
-  def perp_dist(self, p3, p1, p2):
-    p3 = np.asarray(p3)
-    p1 = np.asarray(p1)
-    p2 = np.asarray(p2)
-    #print(p2-p1, p1-p3, np.cross(p2-p1, p1-p3), np.linalg.norm(p2 - p1))
-
-    return np.abs(np.cross(p2-p1, p1-p3)) / np.linalg.norm(p2-p1)
-
-    
-  def dp(self, M, epsilon):
-    dmax = 0.0
-    index = -1
-
-    for i in range(1, len(M) - 1):
-      d = self.perp_dist(M[i], M[0], M[-1])
-      if d > dmax:
-        index = i
-        dmax = d
-
-    if dmax > epsilon:
-      r1 = self.dp(M[:index + 1], epsilon)
-      r2 = self.dp(M[index:], epsilon)
-      return np.vstack((r1[:-1], r2))
-    else:
-      return np.vstack((M[0], M[-1]))
-
-  def Abc(self):
-    res = []
-    for a in self.edge_segments:
-      res.append(self.dp(a, 5))
-    self.edge_segments = res
-#    res = []
-#    for a in self.uni_segs:
-#      res.append(self.dp(a, 5))
-#    self.uni_segs = res
     
   def GaussianFilter(self, filename: str): 
     img = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
@@ -144,9 +107,9 @@ class EdgeDrawing:
       if self.G[row][col] <= 0 or self.visited[row][col]:
         return current_segment
       if self.ED[row][col] == VERTICAL:
+        rest = self.__proceed(row, col)
+        current_segment.extend(rest)
         break
-    rest = self.__proceed(row, col)
-    current_segment.extend(rest)
     return current_segment
 
   def __proceedUD(self, row, col, row_fn, col_fn):
@@ -164,9 +127,10 @@ class EdgeDrawing:
       if self.G[row][col] <= 0 or self.visited[row][col]:
         return current_segment
       if self.ED[row][col] == HORIZONTAL:
+        rest = self.__proceed(row, col)
+        current_segment.extend(rest)
         break
-    rest = self.__proceed(row, col)
-    current_segment.extend(rest)
+
     return current_segment
 
   def __proceed(self, row, col):
@@ -174,17 +138,11 @@ class EdgeDrawing:
       return 
     inc = lambda a: a + 1
     dec = lambda a: a - 1
-    self.visited[row][col] = True
     current_segment = []
+    self.visited[row][col] = True
     if self.ED[row][col] == HORIZONTAL:
       left_segment = self.__proceedLR(row, col, self.__getL, dec)
       right_segment = self.__proceedLR(row, col, self.__getR, inc)
-
-    #  wew = []
-    #  wew.extend(left_segment[::-1])
-    #  wew.append([row, col])
-    #  wew.extend(right_segment)
-    #  self.uni_segs.append(wew)
 
       if len(left_segment) == 0 or len(right_segment) == 0:
         current_segment.extend(left_segment)
@@ -199,12 +157,6 @@ class EdgeDrawing:
     if self.ED[row][col] == VERTICAL:
       down_segment = self.__proceedUD(row, col, dec, self.__getD)
       up_segment = self.__proceedUD(row, col, inc, self.__getU)
-
-    #  wew = []
-    #  wew.extend(down_segment[::-1])
-    #  wew.append([row, col])
-    #  wew.extend(up_segment)
-    #  self.uni_segs.append(wew)
 
       if len(down_segment) == 0 or len(up_segment) == 0:
         current_segment.extend(down_segment)
@@ -229,19 +181,12 @@ class EdgeDrawing:
       for col in range(self.COLS):
         if self.visited[row][col]:
           e.edgels.append([row, col])
-    
-
-
 
 if __name__=="__main__":
   e = EdgeDrawing()
-  print("applying gaussian filter")
-  img = e.GaussianFilter("selfie.png")
-  print("applying sobel operator")
+  img = e.GaussianFilter("peppers.png")
   e.SobelOperator(img) 
-  print("finding anchors")
   e.FindAnchors()
-  print("connecting anchors")
   e.ConnectAnchors()
 
   imgData = np.zeros((np.shape(img) + (3,)), dtype=np.uint8)
@@ -249,24 +194,5 @@ if __name__=="__main__":
     color = [random.randint(0, 128), random.randint(0, 128), random.randint(0, 128)]
     for [x_, y_] in a:
       imgData[x_, y_] = color
-  wewwew = Image.fromarray(imgData, 'RGB')
-  wewwew.save('res1.png')
-
-  e.Abc()
-
-  #imgData2 = np.zeros((np.shape(img) + (3,)), dtype=np.uint8)
-  for a in e.edge_segments:
-    color = [random.randint(0, 128), random.randint(0, 128), random.randint(0, 128)]
-    _x_ = []
-    _y_ = []
-    for [x_, y_] in a:
-      _x_.append(y_)
-      _y_.append(x_)
-
-    plt.plot(_x_, _y_, marker='2')
-  #    imgData2[x_, y_] = color
-  #wew = Image.fromarray(imgData2, 'RGB')
-  #wew.save('res.png')
-  plt.gca().set_aspect('equal', adjustable='box')
-  plt.gca().invert_yaxis()
-  plt.show()
+  result= Image.fromarray(imgData, 'RGB')
+  result.save('result.png')
